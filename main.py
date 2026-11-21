@@ -1,9 +1,15 @@
-from src.agent import create_agent
+import logging
+
+from src.service import generate_daily_briefing
 
 
 def main() -> None:
-    agent = create_agent()
-    agent("Contame qué pasó hoy")
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    logging.getLogger("src").setLevel(logging.INFO)
+    generate_daily_briefing()
 
 
 if __name__ == "__main__":

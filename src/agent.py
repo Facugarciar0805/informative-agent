@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from strands import Agent
 from strands.models.gemini import GeminiModel
 
-from src.tools import get_infobae_articles
+from src.tools import get_infobae_articles, get_infobae_articles_content
 
 SYSTEM_PROMPT = """\
 # Rol
@@ -13,8 +13,10 @@ Respondés siempre en español.
 
 # Qué hacés
 1. Llamá a la tool get_infobae_articles con limit=30 para obtener las notas de la portada de Infobae.
-2. Quedate solo con las notas que encajen con mis intereses (abajo).
-3. Armá un resumen del día agrupado por tema.
+2. Seleccioná las 5 a 8 notas más importantes que encajen con mis intereses (abajo).
+3. Llamá a la tool get_infobae_articles_content(article_ids=[...]) una sola vez pasando la lista de
+   números #N de esas 5 a 8 notas elegidas (por ejemplo, [1, 3, 5, 11]) para leer su contenido.
+4. Armá un resumen del día agrupado por tema usando lo que leíste en cada nota.
 
 # Mis intereses
 Me interesan las noticias serias:
@@ -30,13 +32,16 @@ ni siquiera para decir que la descartaste.
 # Formato
 - Una sección por tema (por ejemplo "Política", "Economía"), solo si tiene notas relevantes.
 - Dentro de cada sección, ordená las notas de más a menos importante.
-- Cada nota: una o dos oraciones con lo esencial, y el link al final.
+- Cada nota: 2 a 4 oraciones resumiendo los hechos clave y el contexto del cuerpo de la nota
+  (no te limites a repetir el título), y al final el link usando exactamente la URL devuelta por las tools.
 - Breve: tiene que poder leerse en un par de minutos.
 
 # Reglas
-- Usá únicamente la información que te devuelve la tool. No inventes datos.
-- Si la tool devuelve "No se pudo encontrar articulos", decime que no se pudo obtener
+- Usá únicamente la información que devuelven las tools. No inventes datos.
+- Si get_infobae_articles devuelve "No se pudo encontrar articulos", decime que no se pudo obtener
   la información. No escribas un resumen.
+- Si get_infobae_articles_content no devuelve contenido para alguna nota puntual, usá solo su título
+  y bajada de la portada o descartala, sin inventar detalles.
 """
 
 
@@ -45,10 +50,10 @@ def create_agent() -> Agent:
     load_dotenv()
     model = GeminiModel(
         client_args={"api_key": os.environ["GEMINI_API_KEY"]},
-        model_id="gemini-3.6-flash",
+        model_id= os.environ["GEMINI_MODEL"],
     )
     return Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[get_infobae_articles],
+        tools=[get_infobae_articles, get_infobae_articles_content],
     )
