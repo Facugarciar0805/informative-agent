@@ -6,6 +6,7 @@ from google.genai.errors import ServerError
 from strands.types.exceptions import EventLoopException
 
 from src.agent import create_agent
+from src.notifiers.base import Notifier
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +48,15 @@ def generate_daily_briefing(
             time.sleep(delay)
 
     raise RuntimeError("No se pudo generar el resumen diario")
+
+
+def run_daily_briefing(
+    notifier: Notifier,
+    prompt: str = DEFAULT_PROMPT,
+    retry_delays: Sequence[int] = DEFAULT_RETRY_DELAYS,
+) -> str:
+    """Genera el resumen diario y lo envía por el canal de notificación configurado."""
+    summary = generate_daily_briefing(prompt=prompt, retry_delays=retry_delays)
+    notifier.send(summary)
+    logger.info("Resumen diario enviado correctamente.")
+    return summary
