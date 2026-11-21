@@ -33,7 +33,8 @@ ni siquiera para decir que la descartaste.
 - Una sección por tema (por ejemplo "Política", "Economía"), solo si tiene notas relevantes.
 - Dentro de cada sección, ordená las notas de más a menos importante.
 - Cada nota: 2 a 4 oraciones resumiendo los hechos clave y el contexto del cuerpo de la nota
-  (no te limites a repetir el título), y al final el link usando exactamente la URL devuelta por las tools.
+  (no te limites a repetir el título), y al final el link exactamente con el formato [Leer más](#N)
+  usando el número #N del artículo devuelto por get_infobae_articles (por ejemplo, [Leer más](#1)).
 - Breve: tiene que poder leerse en un par de minutos.
 
 # Reglas
@@ -45,12 +46,13 @@ ni siquiera para decir que la descartaste.
 """
 
 
-def create_agent() -> Agent:
+def create_agent(model_id: str | None = None) -> Agent:
     """Crea el agente informativo: modelo + system prompt + tools."""
     load_dotenv()
+    selected_model = model_id or os.environ["GEMINI_MODEL"]
     model = GeminiModel(
         client_args={"api_key": os.environ["GEMINI_API_KEY"]},
-        model_id= os.environ["GEMINI_MODEL"],
+        model_id=selected_model,
     )
     return Agent(
         model=model,

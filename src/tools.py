@@ -1,4 +1,5 @@
 import logging
+import re
 
 from strands import tool
 
@@ -11,7 +12,21 @@ logger = logging.getLogger(__name__)
 NO_ARTICLES_MESSAGE = "No se pudo encontrar articulos"
 NO_CONTENT_MESSAGE = "No se pudo obtener el contenido del artículo"
 
+_LINK_PLACEHOLDER_RE = re.compile(r"\[([^\]]+)\]\(#(\d+)\)")
 _cached_articles: list[Article] = []
+
+
+def resolve_article_links(text: str) -> str:
+    """Reemplaza placeholders `[texto](#N)` por la URL canónica cacheada."""
+
+    def _replace(match: re.Match[str]) -> str:
+        label, index_str = match.group(1), match.group(2)
+        index = int(index_str)
+        if 1 <= index <= len(_cached_articles):
+            return f"[{label}]({_cached_articles[index - 1].url})"
+        return match.group(0)
+
+    return _LINK_PLACEHOLDER_RE.sub(_replace, text)
 
 
 @tool
