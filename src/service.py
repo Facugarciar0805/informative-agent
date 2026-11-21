@@ -1,7 +1,9 @@
 from collections.abc import Sequence
+from datetime import datetime
 import logging
 import os
 import time
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from google.genai.errors import ServerError
@@ -9,13 +11,36 @@ from strands.types.exceptions import EventLoopException
 
 from src.agent import create_agent
 from src.notifiers.base import Notifier
-from src.tools import resolve_article_links
+from src.tools import get_last_articles_error, reset_tool_state, resolve_article_links
 
 logger = logging.getLogger(__name__)
 
+ARGENTINA_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 DEFAULT_PROMPT = "Contame qué pasó hoy"
 DEFAULT_RETRY_DELAYS: tuple[int, ...] = (10, 25, 45)
 DEFAULT_FALLBACK_MODELS: tuple[str, ...] = ("gemini-3.6-flash", "gemini-3.8-flash")
+
+
+def _today_str() -> str:
+    """Devuelve la fecha actual en Argentina en formato DD/MM/YYYY."""
+    return datetime.now(ARGENTINA_TZ).strftime("%d/%m/%Y")
+
+
+def _format_briefing(summary: str, date_str: str | None = None) -> str:
+    """Antepone el encabezado fijo con la fecha al resumen generado por el agente."""
+    return f"### Resumen del día — {date_str or _today_str()}\n\n{summary.strip()}"
+
+
+def _build_error_alert(exc: Exception, date_str: str | None = None) -> str:
+    """Construye una alerta corta en Markdown para avisar fallos en el briefing."""
+    detail = str(exc).strip() or "sin detalle"
+    if len(detail) > 300:
+        detail = detail[:297].rstrip() + "..."
+    return (
+        f"### ⚠️ Error en el resumen diario — {date_str or _today_str()}\n\n"
+        "No se pudo generar el briefing de hoy.\n"
+        f"**Motivo:** {type(exc).__name__}: {detail}"
+    )
 
 
 def _is_transient_server_error(exc: Exception) -> bool:
@@ -69,10 +94,17 @@ def generate_daily_briefing(
                 attempt + 1,
                 total_attempts,
             )
+            reset_tool_state()
             agent = create_agent(model_id=model_id)
             try:
                 result = agent(prompt)
-                return resolve_article_links(str(result))
+                scraper_error = get_last_articles_error()
+                if scraper_error:
+                    raise RuntimeError(scraper_error)
+                resolved = resolve_article_links(str(result)).strip()
+                if not resolved:
+                    raise RuntimeError("El agente devolvió un resumen vacío")
+                return _format_briefing(resolved)
             except Exception as exc:
                 if not _is_transient_server_error(exc):
                     raise
@@ -107,12 +139,21 @@ def run_daily_briefing(
     fallback_models: Sequence[str] | None = None,
 ) -> str:
     """Genera el resumen diario y lo envía por el canal de notificación configurado."""
-    summary = generate_daily_briefing(
-        prompt=prompt,
-        retry_delays=retry_delays,
-        primary_model=primary_model,
-        fallback_models=fallback_models,
-    )
+    try:
+        summary = generate_daily_briefing(
+            prompt=prompt,
+            retry_delays=retry_delays,
+            primary_model=primary_model,
+            fallback_models=fallback_models,
+        )
+    except Exception as exc:
+        logger.error("Fallo generando el resumen diario; enviando alerta: %s", exc)
+        try:
+            notifier.send(_build_error_alert(exc))
+        except Exception:
+            logger.exception("No se pudo enviar la alerta de error por el notificador")
+        raise
+
     notifier.send(summary)
     logger.info("Resumen diario enviado correctamente.")
     return summary

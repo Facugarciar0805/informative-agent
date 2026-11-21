@@ -14,6 +14,19 @@ NO_CONTENT_MESSAGE = "No se pudo obtener el contenido del artículo"
 
 _LINK_PLACEHOLDER_RE = re.compile(r"\[([^\]]+)\]\(#(\d+)[\)\]]")
 _cached_articles: list[Article] = []
+_last_articles_error: str | None = None
+
+
+def reset_tool_state() -> None:
+    """Reinicia el estado compartido de las tools antes de cada ejecución."""
+    global _last_articles_error
+    _cached_articles.clear()
+    _last_articles_error = None
+
+
+def get_last_articles_error() -> str | None:
+    """Devuelve el motivo del último fallo al obtener la portada, si hubo alguno."""
+    return _last_articles_error
 
 
 def resolve_article_links(text: str) -> str:
@@ -42,13 +55,20 @@ def get_infobae_articles(limit: int = 10) -> str:
         Si devuelve "No se pudo encontrar articulos", hubo un error con la tool:
         no inventes noticias, avisá que no se pudo obtener la información.
     """
+    global _last_articles_error
     try:
         articles = InfobaeScraper().get_latest_articles(limit=limit)
-    except Exception:
+    except Exception as exc:
+        _last_articles_error = f"Error al consultar Infobae ({type(exc).__name__}: {exc})"
+        _cached_articles.clear()
         logger.exception("Error obteniendo artículos de Infobae")
         return NO_ARTICLES_MESSAGE
     if not articles:
+        _last_articles_error = "Infobae no devolvió artículos (posible cambio en el HTML de la portada)"
+        _cached_articles.clear()
+        logger.warning(_last_articles_error)
         return NO_ARTICLES_MESSAGE
+    _last_articles_error = None
     _cached_articles.clear()
     _cached_articles.extend(articles)
     return format_articles(articles)
