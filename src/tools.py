@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 NO_ARTICLES_MESSAGE = "No se pudo encontrar articulos"
 NO_CONTENT_MESSAGE = "No se pudo obtener el contenido del artículo"
 
-_LINK_PLACEHOLDER_RE = re.compile(r"\[([^\]]+)\]\(#(\d+)\)")
+_LINK_PLACEHOLDER_RE = re.compile(r"\[([^\]]+)\]\(#(\d+)[\)\]]")
 _cached_articles: list[Article] = []
 
 

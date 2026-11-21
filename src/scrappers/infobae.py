@@ -9,6 +9,7 @@ from src.models import Article
 class InfobaeScraper:
     """Scraper específico para la portada de Infobae."""
     BASE_URL: str = "https://www.infobae.com"
+    HOME_URL: str = "https://www.infobae.com/?noredirect"
     _DATE_PATTERN = re.compile(r"/\d{4}/\d{2}/\d{2}/")
     _WHITESPACE_PATTERN = re.compile(r"[ \t]+")
 
@@ -18,7 +19,7 @@ class InfobaeScraper:
 
     def get_latest_articles(self, limit: int = 10) -> List[Article]:
         """Obtiene las notas principales de la portada (tarjetas `story-card-ctn`)."""
-        resp = requests.get(self.BASE_URL, timeout=self.timeout)
+        resp = requests.get(self.HOME_URL, timeout=self.timeout)
         resp.raise_for_status()  # si Infobae responde 4xx/5xx, la excepción sube al llamador
         soup = BeautifulSoup(resp.text, "html.parser")
 
